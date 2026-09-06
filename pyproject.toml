@@ -47,30 +47,38 @@ classifiers = [
 # Golden baseline consistency: the Golden venv carries accelerate/simplejson/
 # xxhash and lacks jsonlines/deepdiff/h5py, matching this classification.
 # See ``patches/lerobot_slim/README.md``.
+#
+# Phase 2 (Round 2) re-ran the same inference import trace against the *full*
+# LingBot dependency list (not just lerobot's) and uninstalled each candidate
+# one at a time, re-running a fixed-observation inference after each removal.
+# 21 of the 29 declared deps are reached on the inference path and stay in
+# ``dependencies``; the 8 below are NEVER imported during inference and are
+# moved to the ``[train]`` extra:
+#   ``blobfile``, ``gymnasium``, ``matplotlib``, ``numpydantic``,
+#   ``omegaconf``, ``tensorboard``, ``termcolor``, ``torchaudio``.
+# The removal test confirmed bitwise parity: after uninstalling all 8 and
+# re-running inference, ``max_abs_diff = 0.0`` and ``bitwise_equal = True``
+# vs. the baseline action (shape (50, 16) both). ``datasets==3.6.0`` IS on the
+# inference path (imported by lerobot, which is --no-deps) and stays in runtime.
+# ``gymnasium==0.29.1`` is NOT on the VLA-inference path — it is owned by the
+# RoboTwin *env* runtime (``rlinf-robotwin-runtime`` pins it), not by LingBot,
+# so moving it here does not remove it from the installed ``[robotwin]`` env.
 dependencies = [
     "accelerate>=1.10.0,<2.0.0",
     "av>=14.2.0",
-    "blobfile>=3.0.0",
     "datasets==3.6.0",
     "diffusers==0.30.3",
     "draccus==0.10.0",
     "einops>=0.8.0",
-    "gymnasium==0.29.1",
     "huggingface-hub[cli]>=0.34,<1.0",
-    "matplotlib",
     "msgpack",
     "numpy==1.26.4",
-    "numpydantic",
-    "omegaconf>=2.3.0",
     "packaging>=24.2",
     "pillow>=10",
     "pyyaml",
     "safetensors",
     "simplejson>=3.19",
-    "tensorboard==2.16.2",
-    "termcolor>=2.4.0",
     "torch==2.7.1",
-    "torchaudio==2.7.1",
     "torchdata>=0.8.0,<1.0",
     "torchvision==0.22.1",
     "tqdm",
@@ -80,10 +88,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# torchcodec is data-path only (lingbotvla/data/vla_data/base_dataset.py) and is
-# not imported on the deploy/inference path (confirmed by Phase 6 import trace).
-# It is therefore opt-in for training/dataset builds rather than a core runtime dep.
+# Deps that are NOT on the deploy/inference path (confirmed by the Phase 2
+# import trace + removal test, ``max_abs_diff = 0.0``) are kept here for
+# training / dataset builds. ``torchcodec`` is data-path only
+# (``lingbotvla/data/vla_data/base_dataset.py``); the other eight were moved
+# out of ``dependencies`` by Phase 2 because they are never imported during
+# inference (see the NOTE above for the per-package list).
 train = [
+    "blobfile>=3.0.0",
+    "gymnasium==0.29.1",
+    "matplotlib",
+    "numpydantic",
+    "omegaconf>=2.3.0",
+    "tensorboard==2.16.2",
+    "termcolor>=2.4.0",
+    "torchaudio==2.7.1",
     "torchcodec==0.5",
 ]
 
