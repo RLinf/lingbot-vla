@@ -15,11 +15,10 @@ existing symbols are imported, not what they are. The slim copies are byte
 identical to the previously-vendored ``vendor/lerobot`` sources, which were in
 turn the official ``0.4.2`` wheel plus exactly these three slimming edits.
 
-This module applies those three files on top of an installed ``lerobot==0.4.2``
-so the runtime can depend on the official wheel instead of a vendored copy. It
-mirrors the design of ``rlinf_robotwin.patches`` (``rlinf-robotwin-patch``):
-package located via ``importlib``, version checked, idempotent, reinstall-safe,
-and version-drift-detecting rather than silently no-op.
+This module ships inside the ``lingbotvla`` wheel (the three slim source files
+are package data under ``lingbotvla/lerobot_slim/patches/``) and applies them
+on top of an installed ``lerobot==0.4.2`` so the runtime can depend on the
+official wheel instead of a vendored copy.
 
 Fail-closed contract
 --------------------
@@ -32,13 +31,17 @@ takes a three-way decision keyed on the file's sha256:
 
 The patched hash is also asserted against the shipped slim source file itself
 (``patch_source_drift`` if it differs), so an accidental edit to
-``patches/lerobot_slim/`` fails loudly instead of installing a different patch.
-A version guard short-circuits the whole run to ``version_mismatch`` (no writes)
-when ``lerobot.__version__ != "0.4.2"``.
+``lingbotvla/lerobot_slim/patches/`` fails loudly instead of installing a
+different patch. A version guard short-circuits the whole run to
+``version_mismatch`` (no writes) when ``lerobot.__version__ != "0.4.2"``.
 
-Run via the ``apply-lerobot-slim`` console script (or ``python -m``) after
-installing ``lerobot==0.4.2`` (use ``--no-deps``; lerobot 0.4.2's own deps
-pin ``torch<2.8`` which conflicts with the RoboTwin CUDA stack).
+Run via the ``apply-lerobot-slim`` console script (declared in ``[project.scripts]``)
+or ``python -m lingbotvla.lerobot_slim`` after installing ``lerobot==0.4.2``
+(use ``--no-deps``; lerobot 0.4.2 pins ``datasets>=4`` and ``gymnasium>=1.1.1``,
+which structurally conflict with the RoboTwin/LingBot runtime pins
+``datasets==3.6.0`` / ``gymnasium==0.29.1`` — the runtime deliberately stays on
+the older versions and lerobot's dataset/training code is not on the inference
+path).
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ import importlib
 import importlib.util
 import sys
 from dataclasses import dataclass
+from importlib import resources
 from pathlib import Path
 
 __all__ = ["SlimReport", "apply_lerobot_slim", "main"]
@@ -79,9 +83,9 @@ _OFFICIAL_SHA: dict[str, str] = {
 }
 
 # sha256 of each file *after* slimming (i.e. of the shipped slim copy in
-# ``patches/lerobot_slim/``). A target matching this is already slimmed ->
-# idempotent no-op. The slim source file itself must also hash to this value
-# (else the patch source has drifted -> ``patch_source_drift``).
+# ``lingbotvla/lerobot_slim/patches/``). A target matching this is already
+# slimmed -> idempotent no-op. The slim source file itself must also hash to
+# this value (else the patch source has drifted -> ``patch_source_drift``).
 _PATCHED_SHA: dict[str, str] = {
     "policies/__init__.py": (
         "70ecece820102b15111588049ac4879abecd4575436ed4f42980c21193494cf4"
@@ -117,23 +121,31 @@ class SlimReport:
 
 
 def _slim_root() -> Path:
-    """Resolve the shipped slim-file source directory.
+    """Resolve the shipped slim-file source directory from package data.
 
-    Layout: ``<repo>/scripts/apply_lerobot_slim.py`` and
-    ``<repo>/patches/lerobot_slim/``. Resolved from ``__file__`` so it works
-    for editable/source installs. (Wheel packaging of the slim files is handled
-    separately when the runtime moves to a non-editable install.)
+    The three slim files ship as package data under
+    ``lingbotvla/lerobot_slim/patches/`` (declared via
+    ``[tool.setuptools.package-data]``), so this resolves from the *installed*
+    ``lingbotvla.lerobot_slim`` package — works for editable installs and for
+    non-editable wheels alike, with no dependency on a source checkout of
+    ``scripts/`` or a top-level ``patches/`` tree.
     """
 
-    here = Path(__file__).resolve().parent
-    candidate = here.parent / "patches" / "lerobot_slim"
-    if candidate.is_dir():
-        return candidate
-    # Fallback: maybe installed alongside the lingbotvla package.
-    raise FileNotFoundError(
-        f"lerobot slim source dir not found at {candidate}. Run from a source "
-        "checkout of rlinf-lingbotvla, or ship patches/lerobot_slim with the wheel."
-    )
+    try:
+        root = Path(resources.files("lingbotvla.lerobot_slim") / "patches")
+    except (ModuleNotFoundError, FileNotFoundError) as exc:  # noqa: BLE001
+        raise FileNotFoundError(
+            "lerobot slim source dir not found in the installed "
+            f"lingbotvla.lerobot_slim package ({exc}). Ensure rlinf-lingbotvla is "
+            "installed (the slim patches ship as package data)."
+        ) from exc
+    if not root.is_dir():
+        raise FileNotFoundError(
+            f"lerobot slim source dir not found at {root}. The "
+            "lingbotvla.lerobot_slim/patches package data is missing from this "
+            "install of rlinf-lingbotvla."
+        )
+    return root
 
 
 def _sha256(text: str) -> str:
@@ -199,7 +211,7 @@ def apply_lerobot_slim() -> list[SlimReport]:
                     relpath=relpath,
                     target=str(slim_src),
                     status="not_found",
-                    detail="slim source file missing from patch dir",
+                    detail="slim source file missing from package data",
                 )
             )
             continue
@@ -215,7 +227,8 @@ def apply_lerobot_slim() -> list[SlimReport]:
                     status="patch_source_drift",
                     detail=(
                         "slim source sha256 does not match the pinned patched "
-                        f"hash {_PATCHED_SHA[relpath]}; inspect patches/lerobot_slim"
+                        f"hash {_PATCHED_SHA[relpath]}; inspect "
+                        "lingbotvla/lerobot_slim/patches"
                     ),
                 )
             )
@@ -274,8 +287,8 @@ def main() -> int:
         print(
             f"\n{hard_failures} slim target(s) failed (fail-closed: no unrecognised "
             "file was overwritten). This usually means the pinned lerobot==0.4.2 "
-            "changed or patches/lerobot_slim drifted. Inspect the source and update "
-            "patches/lerobot_slim.",
+            "changed or lingbotvla/lerobot_slim/patches drifted. Inspect the "
+            "source and update the slim patches.",
             file=sys.stderr,
         )
     return 1 if hard_failures else 0
