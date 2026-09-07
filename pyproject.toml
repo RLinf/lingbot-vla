@@ -7,7 +7,7 @@ name = "rlinf-lingbotvla"
 version = "0.1.0"
 description = "Pinned LingBot-VLA inference runtime maintained by RLinf"
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.10,<3.12"
 license = {file = "LICENSE"}
 authors = [
     {name = "Robbyant Team"},
@@ -18,6 +18,7 @@ classifiers = [
     "Environment :: GPU :: NVIDIA CUDA :: 12",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
 # NOTE: ``lerobot==0.4.2`` is a runtime requirement but is intentionally NOT
@@ -78,7 +79,7 @@ dependencies = [
     "accelerate>=1.10.0,<2.0.0",
     "av>=14.2.0",
     "datasets==3.6.0",
-    "diffusers==0.30.3",
+    "diffusers==0.35.1",
     "draccus==0.10.0",
     "einops>=0.8.0",
     "huggingface-hub[cli]>=0.34,<1.0",
@@ -93,7 +94,16 @@ dependencies = [
     "torchdata>=0.8.0,<1.0",
     "torchvision==0.22.1",
     "tqdm",
-    "transformers==4.51.3",
+    # Round 3: bumped 4.51.3 -> 4.57.6 (pinned to the exact verified version).
+    # Aligns with OpenPI (``>=4.57.1,<4.58``) and RLDX-rpent
+    # (``>=4.57.1,<4.58``) without claiming the untested range. The deep
+    # transformers internals used by the in-repo modeling files
+    # (SlidingWindowCache / ALL_ATTENTION_FUNCTIONS / _flash_attention_forward)
+    # moved in 4.52+; deploy forces ``attention_implementation='eager'`` so the
+    # flash path is dormant, but imports still run. Round 3 Gate 2 is a
+    # single-variable A/B (only transformers differs) on fixed inference — any
+    # drift isolates to this bump with no bisect needed.
+    "transformers==4.57.6",
     "websockets",
     "xxhash>=3.0",
 ]
@@ -148,7 +158,7 @@ lingbotvla = [
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py310"
 line-length = 119
 indent-width = 4
 
