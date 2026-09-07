@@ -30,10 +30,18 @@ from transformers.utils import (
     add_start_docstrings_to_model_forward,
     logging,
     replace_return_docstrings,
-    LossKwargs,
     can_return_tuple,
     is_torch_flex_attn_available,
 )
+# Round-3 compat: transformers 4.57.6 removed ``LossKwargs`` (folded into the
+# unified ``TransformersKwargs`` TypedDict). ``LossKwargs`` is used here only as
+# a TypedDict base class (``KwargsForCausalLM``) with no runtime behaviour, so
+# aliasing to ``TransformersKwargs`` is semantically safe. Keep the real
+# ``LossKwargs`` under transformers <=4.51.
+try:
+    from transformers.utils import LossKwargs
+except ImportError:
+    from transformers.utils import TransformersKwargs as LossKwargs
 from transformers.utils.deprecation import deprecate_kwarg
 from transformers.activations import ACT2FN
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
