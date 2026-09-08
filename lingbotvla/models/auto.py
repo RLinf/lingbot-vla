@@ -22,7 +22,6 @@ from transformers import (
     AutoTokenizer,
     PreTrainedModel,
 )
-from lerobot.configs.policies import PreTrainedConfig
 from ..distributed.parallel_state import get_parallel_state
 from ..utils import logging
 from .loader import BaseModelLoader, get_loader
@@ -77,6 +76,12 @@ def build_foundation_model(
     enable_expert_vision = config_kwargs['enable_expert_vision']
     norm_qkv =  config_kwargs['norm_qkv']
     loss_type = config_kwargs['loss_type']
+
+    # Training/model-build path only: LeRobot's PreTrainedConfig is not needed
+    # for inference (deploy builds the config via transformers' PretrainedConfig
+    # and loads weights manually). Imported lazily so `from lingbotvla.models
+    # import build_processor` does not require lerobot.
+    from lerobot.configs.policies import PreTrainedConfig
 
     config = PreTrainedConfig.from_pretrained(config_path)
     config.train_state_proj = config_kwargs['train_state_proj']

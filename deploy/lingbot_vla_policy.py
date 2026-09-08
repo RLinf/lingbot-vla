@@ -18,6 +18,7 @@ from pathlib import Path
 import transformers
 from transformers import (
     AutoConfig,
+    PretrainedConfig,
 )
 from typing import Union
 import numpy as np
@@ -28,7 +29,6 @@ import torch.nn.functional as F
 from torch import Tensor, nn
 from packaging.version import Version
 
-from lerobot.configs.policies import PreTrainedConfig
 from .websocket_policy_server import WebsocketPolicyServer
 from lingbotvla.models.vla.pi0.modeling_lingbot_vla import LingbotVlaPolicy
 from lingbotvla.data.vla_data.utils import FeatureTransform
@@ -161,7 +161,7 @@ class LingbotVLAServer:
         # load model
     
         print(f"loading model from: {path_to_pi_model}")
-        config = PreTrainedConfig.from_pretrained(path_to_pi_model)
+        config = PretrainedConfig.from_pretrained(path_to_pi_model)
         
         # load training config
         training_config_path = Path(path_to_pi_model)/'lingbotvla_cli.yaml'

@@ -20,7 +20,6 @@ from abc import ABC
 import torch
 from transformers import AutoModel, AutoModelForCausalLM, AutoModelForVision2Seq, PreTrainedModel
 from transformers.modeling_utils import no_init_weights
-from lerobot.policies.pi0.configuration_pi0 import PI0Config
 
 from ..utils import logging
 from ..utils.import_utils import is_torch_npu_available, is_vescale_available
@@ -169,6 +168,11 @@ def _get_model_arch_from_config(model_config):
 
 
 def get_loader(model_config, force_use_huggingface):
+    # Only the training/model-build path needs LeRobot's PI0Config. Imported
+    # lazily so that merely importing this module (reached via
+    # `lingbotvla.models`) does not require lerobot on the inference path.
+    from lerobot.policies.pi0.configuration_pi0 import PI0Config
+
     if isinstance(model_config, PI0Config):
         if 'qwen' not in model_config.tokenizer_path.lower():
             model_arch = 'PI0Policy'

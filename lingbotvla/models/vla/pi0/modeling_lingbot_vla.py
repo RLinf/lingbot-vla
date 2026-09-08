@@ -3,8 +3,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.nn import CrossEntropyLoss
-from lerobot.policies.pi0.configuration_pi0 import PI0Config
-from lerobot.policies.pretrained import PreTrainedPolicy
 from torch import Tensor, nn
 from typing import List, Optional, Tuple, Union, Callable, Dict, Any
 from functools import partial
@@ -1381,17 +1379,17 @@ class QwenvlWithExpertModel(PreTrainedModel):
             )
         return attention_interface
 
-class QwenVLA_Config(PI0Config):
+class QwenVLA_Config(PretrainedConfig):
     model_type = "torch_qwenvla"
     architectures = ["LingbotVlaPolicy"]
 
-class LingbotVlaPolicy(PreTrainedPolicy):
+class LingbotVlaPolicy(nn.Module):
     config_class = QwenVLA_Config
     name = "torch_lingbot_vla"
     _no_split_modules = ["Qwen2DecoderLayer", "FixQwen2RMSNorm"]
     def __init__(
         self,
-        config: PI0Config,
+        config: PretrainedConfig,
         tokenizer_path: str,
         eval: bool=False,
     ):
@@ -1400,8 +1398,8 @@ class LingbotVlaPolicy(PreTrainedPolicy):
             config: Policy configuration class instance or None, in which case the default instantiation of
                     the configuration class is used.
         """
-        
-        super().__init__(config)
+
+        super().__init__()
         self.config = config
         self.language_tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         self.model = FlowMatching(config, eval)

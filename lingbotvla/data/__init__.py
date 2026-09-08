@@ -24,7 +24,21 @@ from .data_collator import (
     UnpackDataCollator,
 )
 from .data_loader import build_dataloader
-from .dataset import build_iterative_dataset, build_mapping_dataset
 from .data_transform import (
     VLADataCollatorWithPacking,
 )
+
+
+def __getattr__(name):
+    # ``dataset`` eagerly does ``from .vla_data import *`` which pulls
+    # ``base_dataset`` -> lerobot. Lazy so that inference imports
+    # (e.g. ``from lingbotvla.data.vla_data.utils import FeatureTransform``)
+    # do not require lerobot; training still loads these on demand.
+    if name in {"build_iterative_dataset", "build_mapping_dataset"}:
+        from .dataset import build_iterative_dataset, build_mapping_dataset
+
+        return {
+            "build_iterative_dataset": build_iterative_dataset,
+            "build_mapping_dataset": build_mapping_dataset,
+        }[name]
+    raise AttributeError(name)
