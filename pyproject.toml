@@ -31,19 +31,21 @@ classifiers = [
 # Training still needs lerobot; install it separately in a training env.
 #
 # Deps below were classified by a real inference import trace (construct
-# ``LingbotVLAServer`` + run one infer, inspect ``sys.modules``). 21 of 29
-# are reached on the inference path and stay in ``dependencies``; the 8 NEVER
+# ``LingbotVLAServer`` + run one infer, inspect ``sys.modules``). 20 of 29
+# are reached on the inference path and stay in ``dependencies``; the 9 NOT
 # imported during inference are moved to the ``[train]`` extra:
-#   ``blobfile``, ``gymnasium``, ``matplotlib``, ``numpydantic``,
+#   ``blobfile``, ``datasets``, ``gymnasium``, ``matplotlib``, ``numpydantic``,
 #   ``omegaconf``, ``tensorboard``, ``termcolor``, ``torchaudio``.
 # The removal test confirmed bitwise parity (``max_abs_diff=0.0``).
+# ``xxhash`` was also removed: it is not imported by any LingBot code (it was
+# only a transitive dep of lerobot/datasets) and the uninstall-verify rerun
+# was bitwise-identical.
 # ``gymnasium==0.29.1`` is NOT on the VLA-inference path — it is owned by the
 # RoboTwin *env* runtime (``rlinf-robotwin-runtime`` pins it), not by LingBot,
 # so moving it here does not remove it from the installed ``[robotwin]`` env.
 dependencies = [
     "accelerate>=1.10.0,<2.0.0",
     "av>=14.2.0",
-    "datasets==3.6.0",
     "diffusers==0.35.1",
     "draccus==0.10.0",
     "einops>=0.8.0",
@@ -70,18 +72,21 @@ dependencies = [
     # drift isolates to this bump with no bisect needed.
     "transformers==4.57.6",
     "websockets",
-    "xxhash>=3.0",
 ]
 
 [project.optional-dependencies]
 # Deps that are NOT on the deploy/inference path (confirmed by the Phase 2
 # import trace + removal test, ``max_abs_diff = 0.0``) are kept here for
 # training / dataset builds. ``torchcodec`` is data-path only
-# (``lingbotvla/data/vla_data/base_dataset.py``); the other eight were moved
+# (``lingbotvla/data/vla_data/base_dataset.py``); ``datasets==3.6.0`` is data-
+# path only (``lingbotvla/data/dataset.py`` + ``base_dataset.py`` import it,
+# but those modules are reached only via the lazy ``data/__init__`` /
+# ``vla_data/__init__`` accessors, never during inference); the rest were moved
 # out of ``dependencies`` by Phase 2 because they are never imported during
 # inference (see the NOTE above for the per-package list).
 train = [
     "blobfile>=3.0.0",
+    "datasets==3.6.0",
     "gymnasium==0.29.1",
     "matplotlib",
     "numpydantic",
