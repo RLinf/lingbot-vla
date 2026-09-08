@@ -21,57 +21,22 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-# NOTE: ``lerobot==0.4.2`` is a runtime requirement but is intentionally NOT
-# listed here as a normal dependency. Round 2 / Phase 3 verified *why* it cannot
-# be one, by feeding the exact pins to the uv resolver:
-#   lerobot==0.4.2 pins ``datasets>=4.0.0,<4.2.0``  — structurally conflicts
-#     with the LingBot runtime pin ``datasets==3.6.0`` (datasets IS on the
-#     inference path, imported by lerobot under --no-deps; LingBot owns it).
-#   lerobot==0.4.2 pins ``gymnasium>=1.1.1,<2.0.0`` — structurally conflicts
-#     with the RoboTwin env-runtime pin ``gymnasium==0.29.1`` (rlinf-robotwin-
-#     runtime owns it; gymnasium is NOT on the VLA-inference path, see Phase 2).
-# The runtime deliberately stays on the older versions; lerobot's
-# dataset/training code (the only caller of datasets>=4 / gymnasium>=1.1) is not
-# on the inference path. lerobot's ``torch>=2.2.1,<2.8.0`` pin IS satisfied by
-# ``torch==2.7.1``, but the datasets/gymnasium conflicts alone keep lerobot on
-# ``--no-deps``. (This is a precise, resolver-confirmed pair of version
-# conflicts — not a vague "lerobot conflicts".)
+# NOTE: LeRobot has been cut from the inference path (this commit series):
+# ``deploy`` uses transformers' ``PretrainedConfig`` / ``nn.Module`` instead of
+# lerobot's ``PreTrainedConfig`` / ``PreTrainedPolicy``, and the training/data-
+# only lerobot imports are lazy (inside functions / package ``__getattr__``).
+# The runtime therefore no longer installs lerobot and no longer ships the
+# ``apply-lerobot-slim`` workaround. Inference is bitwise-identical to the
+# lerobot baseline (``max_abs_diff=0.0``, ``bitwise_equal=True``, verified).
+# Training still needs lerobot; install it separately in a training env.
 #
-# lerobot is therefore installed with ``--no-deps`` (see ``install.sh``), after
-# which the ``apply-lerobot-slim`` console script (declared below in
-# ``[project.scripts]``) reapplies the three load-bearing import-slimming
-# overrides. Those slim files ship as package data inside this wheel at
-# ``lingbotvla/lerobot_slim/patches/`` (resolved at runtime via
-# ``importlib.resources``), so the slim does NOT depend on a source checkout of
-# ``scripts/`` or a top-level ``patches/`` tree. The slim files remove lerobot's
-# hardware-dep import chain, so ``--no-deps`` is safe for inference. The applier
-# is fail-closed (version!=0.4.2 -> no write; official 0.4.2 SHA -> patch;
-# patched SHA -> already-patched no-op; unknown SHA -> no write + abort).
-#
-# Phase 6 classified lerobot's deps by real inference import trace (construct
-# LingbotVLAServer + run one infer, then inspect sys.modules). The subset
-# lerobot imports on the *inference* path — and which LingBot does not already
-# declare transitively — is declared explicitly below: ``accelerate``,
-# ``simplejson``, ``xxhash``. Verified absent on the inference path (and
-# therefore NOT declared): ``jsonlines``, ``deepdiff``, ``h5py`` (lerobot only
-# imports these from its dataset/eval/training modules, which the slim
-# bypasses). ``torchcodec`` is data-path only (``lingbotvla/data/``) and moved
-# to the ``[train]`` extra. Golden baseline consistency: the Golden venv
-# carries accelerate/simplejson/xxhash and lacks jsonlines/deepdiff/h5py,
-# matching this classification. See ``lingbotvla/lerobot_slim/patches/README.md``.
-#
-# Phase 2 (Round 2) re-ran the same inference import trace against the *full*
-# LingBot dependency list (not just lerobot's) and uninstalled each candidate
-# one at a time, re-running a fixed-observation inference after each removal.
-# 21 of the 29 declared deps are reached on the inference path and stay in
-# ``dependencies``; the 8 below are NEVER imported during inference and are
-# moved to the ``[train]`` extra:
+# Deps below were classified by a real inference import trace (construct
+# ``LingbotVLAServer`` + run one infer, inspect ``sys.modules``). 21 of 29
+# are reached on the inference path and stay in ``dependencies``; the 8 NEVER
+# imported during inference are moved to the ``[train]`` extra:
 #   ``blobfile``, ``gymnasium``, ``matplotlib``, ``numpydantic``,
 #   ``omegaconf``, ``tensorboard``, ``termcolor``, ``torchaudio``.
-# The removal test confirmed bitwise parity: after uninstalling all 8 and
-# re-running inference, ``max_abs_diff = 0.0`` and ``bitwise_equal = True``
-# vs. the baseline action (shape (50, 16) both). ``datasets==3.6.0`` IS on the
-# inference path (imported by lerobot, which is --no-deps) and stays in runtime.
+# The removal test confirmed bitwise parity (``max_abs_diff=0.0``).
 # ``gymnasium==0.29.1`` is NOT on the VLA-inference path — it is owned by the
 # RoboTwin *env* runtime (``rlinf-robotwin-runtime`` pins it), not by LingBot,
 # so moving it here does not remove it from the installed ``[robotwin]`` env.
@@ -128,12 +93,6 @@ train = [
 ]
 
 [project.scripts]
-# Fail-closed slim applier for the pinned lerobot==0.4.2 (see NOTE above).
-# Reads the three slim source files from package data
-# (lingbotvla/lerobot_slim/patches/) and writes them onto the installed
-# lerobot==0.4.2; idempotent and version/SHA-guarded. Run after
-# ``uv pip install --no-deps lerobot==0.4.2``.
-apply-lerobot-slim = "lingbotvla.lerobot_slim:main"
 
 [project.urls]
 Homepage = "https://github.com/RLinf/lingbot-vla"
@@ -148,14 +107,6 @@ include = ["deploy*", "lingbotvla*"]
 exclude = ["scripts*", "tasks*", "tests*"]
 
 [tool.setuptools.package-data]
-# The three lerobot slim files ship as package data (NOT as importable modules:
-# patches/ has no __init__.py, so packages.find does not collect it). Resolved
-# at runtime via importlib.resources in lingbotvla.lerobot_slim.
-lingbotvla = [
-    "lerobot_slim/patches/policies/*.py",
-    "lerobot_slim/patches/processor/*.py",
-    "lerobot_slim/patches/*.md",
-]
 
 [tool.ruff]
 target-version = "py310"
