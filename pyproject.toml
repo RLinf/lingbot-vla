@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rlinf-lingbotvla"
-version = "0.1.0"
-description = "Pinned LingBot-VLA inference runtime maintained by RLinf"
-readme = "README.md"
+version = "0.1.1"
+description = "LingBot-VLA inference runtime for RLinf and RPent"
+readme = "PYPI.md"
 requires-python = ">=3.10,<3.12"
 license = {file = "LICENSE"}
 authors = [
@@ -105,6 +105,9 @@ train = [
 [project.urls]
 Homepage = "https://github.com/RLinf/lingbot-vla"
 Repository = "https://github.com/RLinf/lingbot-vla"
+Upstream = "https://github.com/Robbyant/lingbot-vla"
+RPent = "https://github.com/RLinf/RPent"
+Issues = "https://github.com/RLinf/lingbot-vla/issues"
 
 [tool.setuptools]
 include-package-data = true
